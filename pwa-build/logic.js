@@ -1,0 +1,37 @@
+const SUITS=['spades','hearts','diamonds','clubs'];
+const SUIT_SYMBOLS={spades:'♠',hearts:'♥',diamonds:'♦',clubs:'♣'};
+const SUIT_COLORS={spades:'black',hearts:'red',diamonds:'red',clubs:'black'};
+const VALUES=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+function createCard(s,v){return{suit:s,value:v,color:SUIT_COLORS[s],symbol:SUIT_SYMBOLS[s],faceUp:false,id:v+'_'+s}}
+function getValueIndex(v){return VALUES.indexOf(v)}
+function createDeck(){const d=[];for(const s of SUITS)for(const v of VALUES)d.push(createCard(s,v));return d}
+function shuffleDeck(d){const s=[...d];for(let i=s.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[s[i],s[j]]=[s[j],s[i]]}return s}
+function cloneState(s){return JSON.parse(JSON.stringify(s))}
+
+class SolitaireGame{
+constructor(){this.state=null;this.history=[];this.score=0;this.moves=0;this.startTime=null;this.timerInterval=null;this.elapsedSeconds=0;this.gameOver=false;this.gameWon=false;this.onStateChange=null;this.onScoreChange=null;this.onTimerChange=null;this.onWin=null}
+newGame(){this.history=[];this.score=0;this.moves=0;this.elapsedSeconds=0;this.gameOver=false;this.gameWon=false;if(this.timerInterval)clearInterval(this.timerInterval);this.timerInterval=null;const deck=shuffleDeck(createDeck());this.state={stock:[],waste:[],foundations:[[],[],[],[]],tableau:[[],[],[],[],[],[],[]]};let ci=0;for(let c=0;c<7;c++)for(let r=0;r<=c;r++){const card=deck[ci++];card.faceUp=(r===c);this.state.tableau[c].push(card)}for(let i=ci;i<deck.length;i++){deck[i].faceUp=false;this.state.stock.push(deck[i])}if(this.onTimerChange)this.onTimerChange(0);this._nsc();this._nscc()}
+_startTimerIfNeeded(){if(!this.timerInterval&&!this.gameOver&&!this.gameWon)this.startTimer()}
+startTimer(){if(this.timerInterval)clearInterval(this.timerInterval);this.startTime=Date.now();this.elapsedSeconds=0;this.timerInterval=setInterval(()=>{this.elapsedSeconds=Math.floor((Date.now()-this.startTime)/1000);if(this.onTimerChange)this.onTimerChange(this.elapsedSeconds)},1000)}
+stopTimer(){if(this.timerInterval){clearInterval(this.timerInterval);this.timerInterval=null}}
+getFormattedTime(){const m=Math.floor(this.elapsedSeconds/60);const s=this.elapsedSeconds%60;return m.toString().padStart(2,'0')+':'+s.toString().padStart(2,'0')}
+_saveHistory(){this.history.push({state:cloneState(this.state),score:this.score,moves:this.moves});if(this.history.length>200)this.history.shift()}
+undo(){if(this.history.length===0||this.gameOver||this.gameWon)return false;const p=this.history.pop();this.state=p.state;this.score=p.score;this.moves=p.moves;this._nsc();this._nscc();return true}
+canUndo(){return this.history.length>0&&!this.gameOver&&!this.gameWon}
+drawFromStock(){if(this.gameOver||this.gameWon)return false;this._saveHistory();if(this.state.stock.length===0){if(this.state.waste.length===0)return false;this.score=Math.max(0,this.score-20);while(this.state.waste.length>0){const c=this.state.waste.pop();c.faceUp=false;this.state.stock.push(c)}}else{const c=this.state.stock.pop();c.faceUp=true;this.state.waste.push(c)}this.moves++;this._startTimerIfNeeded();this._nsc();this._nscc();return true}
+getTopCard(p){return p.length===0?null:p[p.length-1]}
+canMoveToFoundation(card,fi){const f=this.state.foundations[fi];if(f.length===0)return card.value==='A';const t=this.getTopCard(f);return card.suit===t.suit&&getValueIndex(card.value)===getValueIndex(t.value)+1}
+canMoveToTableau(card,ti){const col=this.state.tableau[ti];if(col.length===0)return card.value==='K';const t=this.getTopCard(col);if(!t.faceUp)return false;return card.color!==t.color&&getValueIndex(card.value)===getValueIndex(t.value)-1}
+moveWasteToFoundation(fi){if(this.gameOver||this.gameWon)return false;if(this.state.waste.length===0)return false;const c=this.getTopCard(this.state.waste);if(!this.canMoveToFoundation(c,fi))return false;this._saveHistory();this.state.waste.pop();this.state.foundations[fi].push(c);this.score+=10;this.moves++;this._startTimerIfNeeded();this._checkWin();this._nsc();this._nscc();return true}
+moveWasteToTableau(ti){if(this.gameOver||this.gameWon)return false;if(this.state.waste.length===0)return false;const c=this.getTopCard(this.state.waste);if(!this.canMoveToTableau(c,ti))return false;this._saveHistory();this.state.waste.pop();this.state.tableau[ti].push(c);this.score+=5;this.moves++;this._startTimerIfNeeded();this._nsc();this._nscc();return true}
+moveTableauToFoundation(ti,fi){if(this.gameOver||this.gameWon)return false;const col=this.state.tableau[ti];if(col.length===0)return false;const c=this.getTopCard(col);if(!c.faceUp||!this.canMoveToFoundation(c,fi))return false;this._saveHistory();col.pop();this.state.foundations[fi].push(c);this.score+=10;this.moves++;this._startTimerIfNeeded();this._flipTop(col);this._checkWin();this._nsc();this._nscc();return true}
+moveTableauToTableau(fi,ti,ci){if(this.gameOver||this.gameWon)return false;const fc=this.state.tableau[fi];if(fc.length===0)return false;const c=fc[ci];if(!c||!c.faceUp||!this.canMoveToTableau(c,ti))return false;this._saveHistory();const mv=fc.splice(ci);this.state.tableau[ti].push(...mv);this.score+=3;this.moves++;this._startTimerIfNeeded();this._flipTop(fc);this._nsc();this._nscc();return true}
+moveFoundationToTableau(fi,ti){if(this.gameOver||this.gameWon)return false;const f=this.state.foundations[fi];if(f.length===0)return false;const c=this.getTopCard(f);if(!this.canMoveToTableau(c,ti))return false;this._saveHistory();f.pop();this.state.tableau[ti].push(c);this.score=Math.max(0,this.score-15);this.moves++;this._startTimerIfNeeded();this._nsc();this._nscc();return true}
+autoMoveToFoundation(card,st,si,ci){if(st==='tableau'){const col=this.state.tableau[si];if(ci!==col.length-1)return false}for(let i=0;i<4;i++){if(this.canMoveToFoundation(card,i)){if(st==='waste')return this.moveWasteToFoundation(i);if(st==='tableau')return this.moveTableauToFoundation(si,i)}}return false}
+_flipTop(col){if(col.length>0){const t=col[col.length-1];if(!t.faceUp){t.faceUp=true;this.score+=5}}}
+_checkWin(){const tot=this.state.foundations.reduce((s,f)=>s+f.length,0);if(tot===52){this.gameWon=true;this.stopTimer();const tb=Math.max(0,1000-this.elapsedSeconds*2);this.score+=tb;if(this.onWin)this.onWin(this.score,this.moves,this.elapsedSeconds)}}
+hasMovesLeft(){if(this.state.stock.length>0)return true;if(this.state.waste.length>0){const wc=this.getTopCard(this.state.waste);for(let i=0;i<4;i++)if(this.canMoveToFoundation(wc,i))return true;for(let i=0;i<7;i++)if(this.canMoveToTableau(wc,i))return true}for(let c=0;c<7;c++){const col=this.state.tableau[c];for(let r=0;r<col.length;r++){const card=col[r];if(!card.faceUp)continue;if(r===col.length-1)for(let f=0;f<4;f++)if(this.canMoveToFoundation(card,f))return true;for(let t=0;t<7;t++)if(t!==c&&this.canMoveToTableau(card,t))return true}}return false}
+_nsc(){if(this.onStateChange)this.onStateChange(this.state)}
+_nscc(){if(this.onScoreChange)this.onScoreChange(this.score,this.moves)}
+canAutoComplete(){if(this.gameWon||this.gameOver)return false;if(this.state.stock.length>0||this.state.waste.length>0)return false;for(let c=0;c<7;c++){const col=this.state.tableau[c];for(let r=0;r<col.length;r++)if(!col[r].faceUp)return false}const tot=this.state.foundations.reduce((s,f)=>s+f.length,0);return tot<52}
+}
