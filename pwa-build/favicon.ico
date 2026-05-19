@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="15" y="20" width="45" height="65" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" transform="rotate(-10 37 52)" />
+  <text x="32" y="62" font-size="30" font-family="-apple-system, sans-serif" font-weight="bold" fill="#ff6b6b" transform="rotate(-10 37 52)" text-anchor="middle">♥</text>
+  
+  <rect x="40" y="15" width="45" height="65" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" transform="rotate(10 62 47)" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.15))" />
+  <text x="62" y="57" font-size="30" font-family="-apple-system, sans-serif" font-weight="bold" fill="#1a1a1a" transform="rotate(10 62 47)" text-anchor="middle">♠</text>
+</svg>
